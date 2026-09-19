@@ -34,3 +34,7 @@ coverage/
 .vite/
 .turbo/
 *.tsbuildinfo
+
+# --- MolMap local runtime data (event logs + evidence) ---
+data/
+*.zip
