@@ -34,3 +34,6 @@ coverage/
 .vite/
 .turbo/
 *.tsbuildinfo
+
+# --- 本应用本地事件日志（运行时数据，不进交付）---
+/data/

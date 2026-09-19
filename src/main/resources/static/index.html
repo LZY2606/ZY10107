@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>分子图结构变换规则审核台</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header>
+  <h1>分子图结构变换规则审核台</h1>
+  <div id="statusbar">
+    <span id="health-pill" class="pill">连接中…</span>
+    <span id="version-pill" class="pill subtle"></span>
+    <button id="refresh-btn" class="small">刷新全部</button>
+    <button id="export-btn" class="small">导出审核包 ZIP</button>
+  </div>
+</header>
+
+<nav id="tabs">
+  <button data-tab="rules" class="tab active">规则库</button>
+  <button data-tab="cases" class="tab">案例与变换</button>
+  <button data-tab="batch" class="tab">批量运行</button>
+  <button data-tab="compose" class="tab">规则组合</button>
+  <button data-tab="conflict" class="tab">并发冲突演示</button>
+  <button data-tab="recovery" class="tab">故障恢复</button>
+</nav>
+
+<main>
+  <section id="tab-rules" class="tab-panel active">
+    <div class="split">
+      <div class="panel">
+        <h2>规则库 <span id="rules-count" class="count"></span></h2>
+        <div id="rules-list" class="list"></div>
+      </div>
+      <div class="panel">
+        <h2>导入新规则（新版本号即新版本，旧版本不被改写）</h2>
+        <p class="hint">规则 JSON：pattern / deleteAtoms / addAtoms / deleteBonds / addBonds。pattern 原子可带 <code>originTag</code> 声明对临时编号来源的依赖。</p>
+        <textarea id="rule-json" class="code" rows="18"></textarea>
+        <div class="row">
+          <input id="rule-id" placeholder="规则 ID（可选）">
+          <button id="validate-rule-btn">校验规则</button>
+          <button id="save-rule-btn" class="primary">入库</button>
+        </div>
+        <pre id="rule-validate-out" class="result"></pre>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-cases" class="tab-panel">
+    <div class="split">
+      <div class="panel">
+        <h2>案例 <span id="cases-count" class="count"></span></h2>
+        <div id="cases-list" class="list"></div>
+        <h3>导入原始证据（接收后不可原地改写）</h3>
+        <input id="case-title" placeholder="案例标题">
+        <textarea id="case-json" class="code" rows="10"></textarea>
+        <button id="save-case-btn" class="primary">接收证据</button>
+      </div>
+      <div class="panel" id="case-workbench">
+        <p class="hint">从左侧选择一个案例。</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-batch" class="tab-panel">
+    <div class="panel">
+      <h2>批量运行</h2>
+      <p class="hint">同一输入可有多个候选产物；默认展示由规范指纹决定，与遍历顺序无关。</p>
+      <label>规则：<select id="batch-rule"></select></label>
+      <div id="batch-case-pickers" class="checkbox-grid"></div>
+      <button id="batch-run-btn" class="primary">运行批量</button>
+      <div id="batch-results"></div>
+    </div>
+  </section>
+
+  <section id="tab-compose" class="tab-panel">
+    <div class="panel">
+      <h2>两条规则先后组合</h2>
+      <p class="hint">先在案例上应用规则 A，再把默认中间产物交给规则 B。若 B 依赖 A 的临时编号（来源标记 / 对临时编号重命名敏感），组合失败且不会留下半个结果。</p>
+      <div class="row">
+        <label>案例 <select id="compose-case"></select></label>
+        <label>规则 A <select id="compose-first"></select></label>
+        <label>规则 B <select id="compose-second"></select></label>
+        <button id="compose-dryrun-btn">预检（不落库）</button>
+        <button id="compose-save-btn" class="primary">执行并记录</button>
+      </div>
+      <div id="compose-out"></div>
+      <h3>历史组合</h3>
+      <div id="compose-history" class="list"></div>
+    </div>
+  </section>
+
+  <section id="tab-conflict" class="tab-panel">
+    <div class="panel">
+      <h2>两个浏览器基于同一旧版本提交</h2>
+      <p class="hint">页面加载时捕获当前数据版本（If-Match）。两边都在自己的旧版本上操作，后提交的一方会收到 <code>VERSION_CONFLICT</code>，并看到对方已提交的冲突内容，可以重新加载后合并。</p>
+      <button id="conflict-setup-btn" class="primary">1. 准备冲突场景（选案例并分析）</button>
+      <div class="split">
+        <div class="panel browser">
+          <h3>浏览器甲（视图版本 <span id="browser-a-version">–</span>）</h3>
+          <pre id="browser-a-view" class="result compact"></pre>
+          <button id="browser-a-lock">锁定默认候选</button>
+          <pre id="browser-a-log" class="result compact"></pre>
+        </div>
+        <div class="panel browser">
+          <h3>浏览器乙（视图版本 <span id="browser-b-version">–</span>）</h3>
+          <pre id="browser-b-view" class="result compact"></pre>
+          <button id="browser-b-lock">锁定（另一个）候选</button>
+          <pre id="browser-b-log" class="result compact"></pre>
+        </div>
+      </div>
+      <button id="conflict-merge-btn">2. 乙方查看冲突并重新加载合并</button>
+    </div>
+  </section>
+
+  <section id="tab-recovery" class="tab-panel">
+    <div class="panel">
+      <h2>事件日志与故障恢复</h2>
+      <pre id="recovery-info" class="result"></pre>
+      <p class="hint">追加日志文件：<code>data/events.log</code>。校验失败时完整文件会被隔离到 <code>data/quarantine/</code>，保留最后一个有效前缀并进入只读模式。README 含一次完整故障恢复演练。</p>
+    </div>
+  </section>
+</main>
+
+<template id="molecule-view">
+  <div class="mol-wrap">
+    <svg class="mol-svg" viewBox="0 0 400 300"></svg>
+  </div>
+</template>
+
+<script src="app.js"></script>
+</body>
+</html>
